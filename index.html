@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="favicon.png">
+<title>Fox Rim</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Fox Rim, développeur généraliste sur Garry's Mod : GLua, level design sous Hammer++, modélisation, HTML/CSS. Fondateur du SCP-RP de Project : Resonance.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=DM+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+/* Concept : l'espace de travail de Fox Rim. Panneaux à label posé sur la bordure (son thème System Delta),
+   une seule couleur d'accent, mono pour les étiquettes, sans-serif lisible pour le texte courant.
+   Perf : aucun backdrop-filter, fond animé à basse résolution et 30 i/s, cartes 3D pilotées en requestAnimationFrame. */
+:root {
+    --bg: #0b0a0a;
+    --panel: #121111;
+    --panel-2: #161515;
+    --line: #2b2828;
+    --line-2: #3b3737;
+    --fg: #ece9e9;
+    --text: #bdb7b7;
+    --muted: #8a8484;
+    --dim: #5f5a5a;
+    --accent: #f2555a;
+    --accent-soft: rgba(242, 85, 90, 0.12);
+    --display: 'Chakra Petch', 'Bahnschrift', 'Segoe UI', sans-serif;
+    --mono: 'DM Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    --sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+    color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.7 var(--sans);
+    -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+::selection { background: var(--accent); color: #140f0f; }
+
+#bg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+
+.wrap {
+    position: relative; z-index: 1;
+    max-width: 1180px; margin: 0 auto;
+    padding-left: max(20px, env(safe-area-inset-left, 0px));
+    padding-right: max(20px, env(safe-area-inset-right, 0px));
+}
+
+/* ---------- barre du haut ---------- */
+.top {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10;
+    background: rgba(11, 10, 10, 0.94);
+    border-bottom: 1px solid var(--line);
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 11; background: var(--bg); }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 60px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--fg); font: 700 16px var(--display); letter-spacing: .04em; }
+.brand em { margin: 0 -.12em; }
+.brand svg { width: 24px; height: 24px; }
+.brand em, h1 em { font-style: normal; color: var(--accent); }
+.top nav { display: flex; gap: 4px; }
+.top nav a { font: 500 13px var(--mono); color: var(--muted); text-decoration: none; padding: 6px 10px; }
+.top nav a:hover { color: var(--fg); }
+.top nav a.live { color: var(--fg); border: 1px solid var(--line-2); }
+.top nav a.live::before { content: ""; display: inline-block; width: 6px; height: 6px; background: var(--accent); margin-right: 8px; vertical-align: 2px; }
+.top nav a.live:hover { border-color: var(--accent); }
+
+/* ---------- panneaux à label ---------- */
+fieldset.p {
+    margin: 0; min-width: 0;
+    border: 1.5px solid var(--line);
+    background: var(--panel);
+    padding: 30px 32px;
+    transition: border-color .2s ease;
+}
+fieldset.p:hover { border-color: var(--line-2); }
+fieldset.p > legend {
+    padding: 0 8px; margin-left: 6px;
+    font: 500 12.5px var(--mono); color: var(--muted); letter-spacing: .02em;
+    transition: color .2s ease;
+}
+fieldset.p:hover > legend { color: var(--accent); }
+
+main { display: grid; gap: 28px; padding-block: 40px 32px; }
+
+/* ---------- intro ---------- */
+.intro { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 28px; }
+.id { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 32px; align-items: center; }
+.id .logo { width: 128px; height: 128px; }
+.id .logo svg { width: 100%; height: 100%; display: block; }
+h1 { margin: 0; font: 700 clamp(44px, 7vw, 80px)/0.92 var(--display); letter-spacing: .04em; color: var(--fg); }
+.role { margin: 14px 0 0; font: 500 14px var(--mono); color: var(--fg); letter-spacing: .02em; }
+.role span { color: var(--dim); }
+.bio { margin: 16px 0 0; max-width: 58ch; }
+.bio b { color: var(--fg); font-weight: 500; }
+
+.now { display: flex; flex-direction: column; gap: 14px; }
+.now .state { font: 500 12px var(--mono); color: var(--accent); letter-spacing: .06em; display: flex; align-items: center; gap: 8px; }
+.now .state::before { content: ""; width: 7px; height: 7px; background: var(--accent); animation: pulse 2.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+.now h2 { margin: 0; font: 600 26px/1.1 var(--display); color: var(--fg); }
+.now p { margin: 0; }
+.now .upd { margin-top: auto; font: 400 12px var(--mono); color: var(--dim); }
+
+/* ---------- projets ---------- */
+.projects { display: grid; gap: 56px; }
+.proj { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 44px; align-items: center; }
+.proj:nth-child(even) .card { order: 2; }
+.proj + .proj { border-top: 1px solid var(--line); padding-top: 56px; }
+
+.card { perspective: 1000px; }
+.card .inner {
+    position: relative; aspect-ratio: 16 / 10; max-width: 100%;
+    border: 1px solid var(--line-2); background: #0e0d0d; overflow: hidden;
+    transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+    box-shadow: 0 18px 40px rgba(0, 0, 0, .45);
+}
+.card.on .inner { border-color: rgba(242, 85, 90, .55); box-shadow: 0 28px 60px rgba(0, 0, 0, .6); }
+.card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.card .glare {
+    position: absolute; inset: 0; pointer-events: none; opacity: var(--go, 0);
+    background: radial-gradient(circle at var(--gx, 50%) var(--gy, 50%), rgba(255, 255, 255, .14), transparent 50%);
+}
+.card .cap {
+    position: absolute; left: 12px; bottom: 12px;
+    font: 500 11.5px var(--mono); color: var(--fg); letter-spacing: .03em;
+    background: rgba(11, 10, 10, .85); border: 1px solid var(--line-2); padding: 3px 9px;
+}
+
+.kind { font: 500 12px var(--mono); color: var(--accent); letter-spacing: .08em; }
+.proj h3 { margin: 8px 0 14px; font: 700 clamp(28px, 3.4vw, 38px)/1.05 var(--display); color: var(--fg); letter-spacing: .01em; }
+.proj p { margin: 0; max-width: 54ch; }
+.proj p b { color: var(--fg); font-weight: 500; }
+.meta { margin: 22px 0 0; display: grid; gap: 0; border-top: 1px solid var(--line); }
+.meta div { display: grid; grid-template-columns: 110px 1fr; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.meta dt { font: 400 12.5px var(--mono); color: var(--dim); align-self: center; }
+.meta dd { margin: 0; color: var(--fg); }
+.more { display: inline-flex; align-items: center; gap: 8px; margin-top: 22px; font: 500 13px var(--mono); color: var(--fg); text-decoration: none; padding: 9px 14px; border: 1px solid var(--line-2); }
+.more:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- outils + contact ---------- */
+.bottom { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 28px; }
+.tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 32px; margin: 0; }
+.tool { padding: 14px 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; }
+.tool dt { font: 600 17px var(--display); color: var(--fg); }
+.tool .freq { font: 400 12px var(--mono); color: var(--dim); align-self: center; }
+.tool dd { margin: 0; grid-column: 1 / -1; font-size: 14px; }
+
+.contact { display: grid; }
+.contact a, .contact button {
+    display: grid; grid-template-columns: 74px 1fr auto; gap: 10px; align-items: center;
+    padding: 13px 0; border: none; border-bottom: 1px solid var(--line);
+    background: none; color: var(--fg); font: 500 15px var(--sans); text-align: left; text-decoration: none; cursor: pointer;
+}
+.contact small { font: 400 12px var(--mono); color: var(--dim); }
+.contact .go { font: 400 13px var(--mono); color: var(--dim); }
+.contact a:hover .go, .contact button:hover .go, .contact a:hover span:not(.go), .contact button:hover span:not(.go) { color: var(--accent); }
+
+footer { border-top: 1px solid var(--line); }
+footer .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-block: 22px 30px; font: 400 12.5px var(--mono); color: var(--dim); }
+footer a { text-decoration: none; }
+footer a:hover { color: var(--accent); }
+
+
+
+/* panneaux stream + setup */
+.bottom { grid-template-rows: auto auto; }
+.stream { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px 28px; align-items: end; }
+.stream .state { font: 500 12px var(--mono); color: var(--accent); letter-spacing: .06em; display: flex; align-items: center; gap: 8px; grid-column: 1 / -1; }
+.stream .state::before { content: ""; width: 7px; height: 7px; background: var(--accent); }
+.stream h2 { margin: 0 0 8px; font: 600 26px/1.1 var(--display); color: var(--fg); }
+.stream p { margin: 0; max-width: 60ch; }
+.stream ul { margin: 14px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px; }
+.stream li { font: 500 12px var(--mono); color: var(--fg); border: 1px solid var(--line-2); padding: 3px 10px; }
+.stream .more { margin-top: 0; white-space: nowrap; }
+.setup { margin: 0; display: grid; }
+.setup div { display: grid; grid-template-columns: 96px 1fr; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.setup dt { font: 400 12px var(--mono); color: var(--dim); }
+.setup dd { margin: 0; color: var(--fg); font-size: 15px; }
+.setup dd small { display: block; color: var(--muted); font-size: 13px; }
+@media (max-width: 600px) { .stream { grid-template-columns: minmax(0, 1fr); } }
+
+
+/* aperçu overlay + équipe */
+.stream .shotsm { grid-column: 1 / -1; position: relative; border: 1px solid var(--line-2); aspect-ratio: 16 / 9; max-width: 100%; overflow: hidden; margin-top: 6px; }
+.stream .shotsm img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.stream .shotsm span { position: absolute; left: 10px; bottom: 10px; font: 500 11.5px var(--mono); color: var(--fg); background: rgba(11,10,10,.85); border: 1px solid var(--line-2); padding: 3px 9px; }
+.team-p { grid-column: 1 / -1; }
+.team { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 32px; }
+.mate { padding: 16px 0; border-bottom: 1px solid var(--line); display: grid; gap: 4px; }
+.mate b { font: 600 20px var(--display); color: var(--fg); }
+.mate span { font: 400 12px var(--mono); color: var(--accent); letter-spacing: .04em; }
+.mate p { margin: 4px 0 0; font-size: 14px; }
+.mate a { font: 500 12.5px var(--mono); color: var(--fg); text-decoration: none; margin-top: 6px; }
+.mate a:hover { color: var(--accent); }
+.team-note { margin: 16px 0 0; font-size: 13px; color: var(--dim); }
+@media (max-width: 760px) { .team { grid-template-columns: minmax(0, 1fr); } }
+
+
+/* chiffres de l'intro + parcours */
+.team { align-items: start; }
+.facts { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0 0; padding: 0; list-style: none; }
+.facts li { border: 1px solid var(--line-2); padding: 6px 12px; font: 500 12.5px var(--mono); color: var(--muted); }
+.facts li b { font: 700 16px var(--display); color: var(--fg); margin-right: 6px; }
+.road { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; position: relative; }
+.road::before { content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 2px; background: var(--line-2); }
+.road li { position: relative; padding: 30px 22px 0 0; }
+.road li::before { content: ""; position: absolute; left: 0; top: 0; width: 16px; height: 16px; background: var(--panel); border: 2px solid var(--line-2); }
+.road li.hi::before { border-color: var(--accent); background: var(--accent); }
+.road time { font: 500 12.5px var(--mono); color: var(--accent); letter-spacing: .06em; }
+.road h4 { margin: 6px 0 6px; font: 600 20px/1.15 var(--display); color: var(--fg); }
+.road p { margin: 0; font-size: 14px; }
+@media (max-width: 860px) {
+  .road { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .road::before { left: 7px; right: auto; top: 0; bottom: 0; width: 2px; height: auto; }
+  .road li { padding: 0 0 0 34px; }
+}
+
+/* choix de la langue */
+.top nav { align-items: center; }
+.lang { display: flex; margin-left: 10px; border: 1px solid var(--line-2); }
+.lang button { font: 500 12px var(--mono); color: var(--muted); background: none; border: none; padding: 6px 9px; cursor: pointer; }
+.lang button + button { border-left: 1px solid var(--line-2); }
+.lang button:hover { color: var(--fg); }
+.lang button[aria-pressed="true"] { color: #140f0f; background: var(--accent); }
+
+@media (max-width: 920px) {
+    .intro, .bottom { grid-template-columns: minmax(0, 1fr); }
+    .proj { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+    .proj:nth-child(even) .card { order: 0; }
+}
+@media (max-width: 600px) {
+    fieldset.p { padding: 24px 18px; }
+    .id { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+    .id .logo { width: 84px; height: 84px; }
+    .tools { grid-template-columns: minmax(0, 1fr); }
+    .top nav a:not(.live) { display: none; }
+    .projects { gap: 40px; } .proj + .proj { padding-top: 40px; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="fox" viewBox="10 10 80 80">
+      <polygon fill="#f4f2f2" points="18,14 40,38 60,38 82,14 88,52 50,88 12,52"/>
+      <g fill="#121111">
+        <polygon opacity=".6" points="24,25 36,38 28,43"/>
+        <polygon opacity=".6" points="76,25 64,38 72,43"/>
+        <polygon opacity=".2" points="40,38 60,38 50,54"/>
+        <polygon opacity=".16" points="12,52 32,63 50,88"/>
+        <polygon opacity=".16" points="88,52 68,63 50,88"/>
+        <polygon points="45,77 55,77 50,83"/>
+        <polygon points="29,52 44,57 34,61"/>
+        <polygon points="71,52 56,57 66,61"/>
+      </g>
+    </symbol>
+  </defs>
+</svg>
+
+<canvas id="bg" aria-hidden="true"></canvas>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Fox Rim, haut de page"><svg aria-hidden="true"><use href="#fox"/></svg>FOX<em>·</em>RIM</a>
+    <nav aria-label="Sections">
+      <a href="#projets" data-i18n="nav.projects">projets</a>
+      <a href="#parcours" data-i18n="lg.road">parcours</a>
+      <a href="#outils" data-i18n="nav.tools">outils</a>
+      <a href="#stream" data-i18n="nav.stream">stream</a>
+      <a href="#equipe" data-i18n="lg.team">équipe</a>
+      <a href="#contact" data-i18n="nav.contact">contact</a>
+      <a class="live" href="https://www.twitch.tv/foxrimtv" target="_blank" rel="noopener">twitch</a>
+      <div class="lang" role="group" aria-label="Language"><button type="button" id="lang-en" data-lang="en">EN</button><button type="button" id="lang-de" data-lang="de">DE</button><button type="button" id="lang-fr" data-lang="fr">FR</button></div>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <main id="top">
+    <section class="intro">
+      <fieldset class="p">
+        <legend>fox.rim</legend>
+        <div class="id">
+          <div class="logo"><svg role="img" aria-label="Logo Fox Rim"><use href="#fox"/></svg></div>
+          <div>
+            <h1>FOX<em>·</em>RIM</h1>
+            <p class="role" data-i18n="role">développeur généraliste <span>/</span> garry's mod</p>
+            <p class="bio" data-i18n="bio">Je fais un peu de tout sur Garry's Mod : du <b>GLua</b>, des maps sous <b>Hammer++</b>, de la modélisation et des pages en HTML/CSS. J'ai lancé le <b>SCP-RP de Project : Resonance</b> et je m'en occupe au quotidien. Je stream souvent quand je bosse.</p>
+            <ul class="facts"><li><b>7+</b><span data-i18n="f.years">ans de dev</span></li><li><b>3</b><span data-i18n="f.proj">projets en avant</span></li><li><b>FR</b><span data-i18n="f.where">basé en France</span></li></ul>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="p">
+        <legend data-i18n="lg.now">en ce moment</legend>
+        <div class="now">
+          <span class="state" data-i18n="now.state">en cours</span>
+          <h2 data-i18n="now.title">Intérieur d'Area 37</h2>
+          <p data-i18n="now.text">Couloirs, zones de confinement et salles techniques de la map du site, sous Hammer++.</p>
+          <span class="upd" data-i18n="now.upd">mis à jour le 4 novembre 2026</span>
+        </div>
+      </fieldset>
+    </section>
+
+    <fieldset class="p" id="projets">
+      <legend data-i18n="lg.projects">projets</legend>
+      <div class="projects">
+        <article class="proj">
+          <div class="card">
+            <div class="inner">
+              <img src="images/area37.jpg" data-i18n-alt="alt1" alt="Vue de dessus de la map Area 37 dans Hammer++" loading="lazy">
+              <span class="cap" data-i18n="p1.cap">vue de dessus · hammer++</span>
+              <div class="glare"></div>
+            </div>
+          </div>
+          <div>
+            <span class="kind">level design · hammer++</span>
+            <h3>Area 37</h3>
+            <p data-i18n="p1.text">La map du site de notre SCP-RP. Je fais <b>tout l'intérieur</b> ; l'extérieur, c'est GRAVES. Le plus gros du boulot, c'est que le passage entre nos deux parties soit propre.</p>
+            <dl class="meta">
+              <div><dt data-i18n="meta.role">mon rôle</dt><dd data-i18n="p1.role">intérieur, level design</dd></div>
+              <div><dt data-i18n="meta.tools">outils</dt><dd>Hammer++, Source</dd></div>
+              <div><dt data-i18n="meta.state">état</dt><dd data-i18n="p1.state">en cours</dd></div>
+            </dl>
+          </div>
+        </article>
+
+        <article class="proj">
+          <div class="card">
+            <div class="inner">
+              <img src="images/resonance.jpg" data-i18n-alt="alt2" alt="Présentation du SCP-RP sur le site de Project : Resonance" loading="lazy">
+              <span class="cap" data-i18n="p2.cap">présentation du mode</span>
+              <div class="glare"></div>
+            </div>
+          </div>
+          <div>
+            <span class="kind" data-i18n="p2.kind">serveur · garry's mod</span>
+            <h3>SCP-RP · Project : Resonance</h3>
+            <p data-i18n="p2.text">J'ai lancé le mode SCP-RP sur Project : Resonance et j'en suis responsable. Je code une partie des systèmes en GLua, je bosse sur les maps et je gère le mode avec le reste de l'équipe.</p>
+            <dl class="meta">
+              <div><dt data-i18n="meta.role">mon rôle</dt><dd data-i18n="p2.role">fondateur, responsable</dd></div>
+              <div><dt data-i18n="meta.tools">outils</dt><dd>GLua, Hammer++</dd></div>
+              <div><dt data-i18n="meta.state">état</dt><dd data-i18n="p2.state">en ligne</dd></div>
+            </dl>
+            <a class="more" href="https://discord.gg/scpr" target="_blank" rel="noopener" data-i18n="p2.more">rejoindre le discord ↗</a>
+          </div>
+        </article>
+
+        <article class="proj">
+          <div class="card">
+            <div class="inner">
+              <img src="images/systemdelta.jpg" data-i18n-alt="alt3" alt="Le thème System Delta sur une fenêtre de discussion" loading="lazy">
+              <span class="cap" data-i18n="p3.cap">aperçu · profils fictifs</span>
+              <div class="glare"></div>
+            </div>
+          </div>
+          <div>
+            <span class="kind" data-i18n="p3.kind">ui · thème</span>
+            <h3>System Delta</h3>
+            <p data-i18n="p3.text">Mon thème perso, le même partout : Discord, Spotify, Zen Browser et VS Code. Police mono, cadres avec le nom du panneau posé sur la bordure, coins carrés, rouge au survol, et une version verre.</p>
+            <dl class="meta">
+              <div><dt data-i18n="meta.base">basé sur</dt><dd>system24 (refact0r)</dd></div>
+              <div><dt data-i18n="meta.tools">outils</dt><dd>CSS, Vencord, Spicetify</dd></div>
+              <div><dt data-i18n="meta.state">état</dt><dd data-i18n="p3.state">utilisé tous les jours</dd></div>
+            </dl>
+          </div>
+        </article>
+      </div>
+    </fieldset>
+
+    <fieldset class="p" id="parcours">
+      <legend data-i18n="lg.road">parcours</legend>
+      <ol class="road">
+        <li><time data-i18n="r1.t">~2019</time><h4 data-i18n="r1.h">Premiers pas</h4><p data-i18n="r1.p">Je commence à développer, et je n'ai jamais arrêté depuis.</p></li>
+        <li class="hi"><time>2023</time><h4 data-i18n="r2.h">Le déclic</h4><p data-i18n="r2.p">Gros bond en compétences : je passe un vrai cap, en code comme en mapping.</p></li>
+        <li><time data-i18n="r3.t">ensuite</time><h4 data-i18n="r3.h">SCP-RP · Resonance</h4><p data-i18n="r3.p">Je lance le mode SCP-RP sur Project : Resonance et j'en prends la responsabilité.</p></li>
+        <li class="hi"><time data-i18n="r4.t">2026 · maintenant</time><h4 data-i18n="r4.h">Area 37 &amp; stream</h4><p data-i18n="r4.p">L'intérieur de la map du site, mon thème System Delta, et des lives sur Twitch.</p></li>
+      </ol>
+    </fieldset>
+
+    <section class="bottom">
+      <fieldset class="p" id="outils">
+        <legend data-i18n="lg.tools">outils</legend>
+        <dl class="tools">
+          <div class="tool"><dt>GLua</dt><span class="freq" data-i18n="f.daily">tous les jours</span><dd data-i18n="t1">systèmes et scripts pour le serveur</dd></div>
+          <div class="tool"><dt>Hammer++</dt><span class="freq" data-i18n="f.daily">tous les jours</span><dd>level design, Area 37</dd></div>
+          <div class="tool"><dt>Blender</dt><span class="freq" data-i18n="f.often">régulièrement</span><dd data-i18n="t3">modélisation, sans texturing</dd></div>
+          <div class="tool"><dt>HTML / CSS</dt><span class="freq" data-i18n="f.often">régulièrement</span><dd data-i18n="t4">pages, thèmes, ce site</dd></div>
+        </dl>
+      </fieldset>
+
+      <fieldset class="p" id="contact">
+        <legend data-i18n="lg.contact">contact</legend>
+        <div class="contact">
+          <button type="button" id="copy-discord" data-copy="foxrim"><small>discord</small><span>foxrim</span><span class="go" aria-live="polite">copier</span></button>
+          <a href="https://www.twitch.tv/foxrimtv" target="_blank" rel="noopener"><small>twitch</small><span>FoxRimTV</span><span class="go">↗</span></a>
+          <a href="https://desc.gg/foxrim" target="_blank" rel="noopener"><small data-i18n="c.links">liens</small><span>desc.gg/foxrim</span><span class="go">↗</span></a>
+        </div>
+      </fieldset>
+
+      <fieldset class="p" id="stream">
+        <legend data-i18n="lg.stream">stream</legend>
+        <div class="stream">
+          <span class="state">twitch · FoxRimTV</span>
+          <div>
+            <h2 data-i18n="s.title">Je bosse en direct</h2>
+            <p data-i18n="s.text">Je stream mes sessions de travail : du mapping sous Hammer++, des scripts GLua et des tests en jeu sur le serveur. Le stream a son propre habillage, dans l'univers SCP de la Zone 37.</p>
+            <ul>
+              <li data-i18n="s.t1">mapping</li><li data-i18n="s.t2">scripts</li><li data-i18n="s.t3">tests en jeu</li><li>SCP-RP</li>
+            </ul>
+          </div>
+          <a class="more" href="https://www.twitch.tv/foxrimtv" target="_blank" rel="noopener" data-i18n="s.more">regarder sur twitch ↗</a>
+          <div class="shotsm">
+            <img src="images/overlay.jpg" data-i18n-alt="alt4" alt="Écran de début de stream dans l'univers SCP" loading="lazy">
+            <span data-i18n="s.cap">écran de début du stream</span>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="p" id="setup">
+        <legend>setup</legend>
+        <dl class="setup">
+          <div><dt data-i18n="su.map">mapping</dt><dd>Hammer++</dd></div>
+          <div><dt>3D</dt><dd>Blender</dd></div>
+          <div><dt data-i18n="su.code">code</dt><dd>VS Code<small data-i18n="su.codeN">avec mon thème System Delta</small></dd></div>
+          <div><dt>stream</dt><dd>Streamlabs</dd></div>
+          <div><dt data-i18n="su.web">navigateur</dt><dd>Zen Browser</dd></div>
+        </dl>
+      </fieldset>
+    </section>
+
+      <fieldset class="p team-p" id="equipe">
+        <legend data-i18n="lg.team">équipe</legend>
+        <div class="team">
+          <div class="mate">
+            <span data-i18n="m1.role">mapping · extérieur</span>
+            <b>GRAVES</b>
+            <p data-i18n="m1.text">Fait l'extérieur d'Area 37 pendant que je fais l'intérieur.</p>
+          </div>
+          <div class="mate">
+            <span data-i18n="m2.role">dev · rendu</span>
+            <b>Khall</b>
+            <p data-i18n="m2.text">Dev Garry's Mod, s'occupe notamment de l'éclairage différé.</p>
+            <a href="https://khallg.github.io/khall-portfolio/" target="_blank" rel="noopener" data-i18n="m.port">portfolio ↗</a>
+          </div>
+          <div class="mate">
+            <span data-i18n="m3.role">dev · full-stack</span>
+            <b>Mixed</b>
+            <p data-i18n="m3.text">Dev full-stack, aussi dans l'équipe.</p>
+            <a href="https://mixedlabs.dev/" target="_blank" rel="noopener">mixedlabs.dev ↗</a>
+          </div>
+        </div>
+        <p class="team-note" data-i18n="team.note">Le thème System Delta est basé sur system24 de refact0r.</p>
+      </fieldset>
+  </main>
+</div>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 Fox Rim · Garry's Mod · France</span>
+    <a href="#top" data-i18n="foot.top">haut de page ↑</a>
+  </div>
+</footer>
+
+<script>
+(function () {
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    /* copier le pseudo Discord */
+    var btn = document.getElementById('copy-discord'), go = btn.querySelector('.go');
+    btn.addEventListener('click', function () {
+        var done = function () { go.textContent = I18N[LANG].copied; setTimeout(function () { go.textContent = I18N[LANG].copy; }, 1600); };
+        try { navigator.clipboard.writeText(btn.dataset.copy).then(done, function () { go.textContent = 'foxrim'; }); }
+        catch (e) { go.textContent = 'foxrim'; }
+    });
+
+
+    /* ---------- langues : anglais par défaut, choix retenu sur cet appareil ---------- */
+    var I18N = {
+        en: {
+            'f.years': 'years of dev', 'f.proj': 'featured projects', 'f.where': 'based in France', 'lg.road': 'journey',
+            'r1.t': '~2019', 'r1.h': 'First steps', 'r1.p': 'I start developing, and I haven\'t stopped since.',
+            'r2.h': 'The click', 'r2.p': 'A huge jump in skills: I really level up, in code as much as in mapping.',
+            'r3.t': 'then', 'r3.h': 'SCP-RP · Resonance', 'r3.p': 'I launch the SCP-RP mode on Project : Resonance and take charge of it.',
+            'r4.t': '2026 · now', 'r4.h': 'Area 37 &amp; stream', 'r4.p': 'The interior of the site map, my System Delta theme, and live streams on Twitch.',
+            'lg.team': 'team', 'm1.role': 'mapping · exterior', 'm1.text': 'Builds the exterior of Area 37 while I build the interior.',
+            'm2.role': 'dev · rendering', 'm2.text': 'Garry\'s Mod dev, works on deferred lighting among other things.', 'm.port': 'portfolio ↗',
+            'm3.role': 'dev · full-stack', 'm3.text': 'Full-stack dev, also part of the team.', 'team.note': 'The System Delta theme is based on system24 by refact0r.',
+            's.cap': 'stream starting screen', 'alt4': 'Stream starting screen in the SCP universe',
+            'lg.stream': 'stream', 'nav.stream': 'stream',
+            's.title': 'I work live', 's.text': 'I stream my work sessions: mapping in Hammer++, GLua scripts and in-game tests on the server. The stream has its own overlay, set in the SCP universe of Zone 37.',
+            's.t1': 'mapping', 's.t2': 'scripts', 's.t3': 'in-game tests', 's.more': 'watch on twitch ↗',
+            'su.map': 'mapping', 'su.code': 'code', 'su.codeN': 'with my System Delta theme', 'su.web': 'browser',
+            'nav.projects': 'projects', 'nav.tools': 'tools', 'nav.contact': 'contact',
+            'lg.now': 'right now', 'lg.projects': 'projects', 'lg.tools': 'tools', 'lg.contact': 'contact',
+            'role': 'generalist developer <span>/</span> garry\'s mod',
+            'bio': 'I do a bit of everything on Garry\'s Mod: <b>GLua</b>, maps in <b>Hammer++</b>, 3D modeling and HTML/CSS pages. I started the <b>SCP-RP on Project : Resonance</b> and I run it day to day. I often stream while I work.',
+            'now.state': 'in progress', 'now.title': 'Area 37 interior',
+            'now.text': 'Corridors, containment zones and technical rooms for the site map, built in Hammer++.',
+            'now.upd': 'updated November 4, 2026',
+            'p1.cap': 'top view · hammer++',
+            'p1.text': 'The site map for our SCP-RP. I build <b>the whole interior</b>; the exterior is GRAVES\'s work. Most of the job is making the transition between our two parts seamless.',
+            'p1.role': 'interior, level design', 'p1.state': 'in progress',
+            'p2.cap': 'game mode presentation', 'p2.kind': 'server · garry\'s mod',
+            'p2.text': 'I started the SCP-RP game mode on Project : Resonance and I\'m in charge of it. I code part of the systems in GLua, work on the maps and run the mode with the rest of the team.',
+            'p2.role': 'founder, lead', 'p2.state': 'online', 'p2.more': 'join the discord ↗',
+            'p3.cap': 'preview · fictional profiles', 'p3.kind': 'ui · theme',
+            'p3.text': 'My personal theme, the same everywhere: Discord, Spotify, Zen Browser and VS Code. Monospace font, panels with their name on the border, square corners, red on hover, and a glass version.',
+            'p3.state': 'used every day',
+            'meta.role': 'my role', 'meta.tools': 'tools', 'meta.state': 'status', 'meta.base': 'based on',
+            'f.daily': 'every day', 'f.often': 'regularly',
+            't1': 'systems and scripts for the server', 't3': 'modeling, no texturing', 't4': 'pages, themes, this site',
+            'c.links': 'links', 'copy': 'copy', 'copied': 'copied ✓', 'foot.top': 'back to top ↑',
+            'alt1': 'Top view of the Area 37 map in Hammer++',
+            'alt2': 'Presentation of the SCP-RP mode on the Project : Resonance website',
+            'alt3': 'The System Delta theme on a chat window',
+            'desc': 'Fox Rim, generalist developer on Garry\'s Mod: GLua, level design in Hammer++, 3D modeling, HTML/CSS. Founder of the SCP-RP on Project : Resonance.'
+        },
+        de: {
+            'f.years': 'jahre entwicklung', 'f.proj': 'ausgewählte projekte', 'f.where': 'aus Frankreich', 'lg.road': 'werdegang',
+            'r1.t': '~2019', 'r1.h': 'Erste Schritte', 'r1.p': 'Ich fange an zu entwickeln und habe seitdem nie aufgehört.',
+            'r2.h': 'Der Durchbruch', 'r2.p': 'Ein riesiger Sprung bei den Fähigkeiten: Ich erreiche ein neues Level, beim Code wie beim Mapping.',
+            'r3.t': 'danach', 'r3.h': 'SCP-RP · Resonance', 'r3.p': 'Ich starte den SCP-RP-Modus auf Project : Resonance und übernehme die Verantwortung dafür.',
+            'r4.t': '2026 · jetzt', 'r4.h': 'Area 37 &amp; Stream', 'r4.p': 'Der Innenbereich der Site-Map, mein Theme System Delta und Livestreams auf Twitch.',
+            'lg.team': 'team', 'm1.role': 'mapping · außenbereich', 'm1.text': 'Baut den Außenbereich von Area 37, während ich den Innenbereich mache.',
+            'm2.role': 'dev · rendering', 'm2.text': 'Garry\'s-Mod-Dev, kümmert sich unter anderem um das Deferred Lighting.', 'm.port': 'portfolio ↗',
+            'm3.role': 'dev · full-stack', 'm3.text': 'Full-Stack-Dev, ebenfalls im Team.', 'team.note': 'Das Theme System Delta basiert auf system24 von refact0r.',
+            's.cap': 'startbildschirm des streams', 'alt4': 'Startbildschirm des Streams im SCP-Universum',
+            'lg.stream': 'stream', 'nav.stream': 'stream',
+            's.title': 'Ich arbeite live', 's.text': 'Ich streame meine Arbeitssessions: Mapping in Hammer++, GLua-Skripte und Tests im Spiel auf dem Server. Der Stream hat sein eigenes Overlay im SCP-Universum der Zone 37.',
+            's.t1': 'mapping', 's.t2': 'skripte', 's.t3': 'tests im spiel', 's.more': 'auf twitch ansehen ↗',
+            'su.map': 'mapping', 'su.code': 'code', 'su.codeN': 'mit meinem Theme System Delta', 'su.web': 'browser',
+            'nav.projects': 'projekte', 'nav.tools': 'tools', 'nav.contact': 'kontakt',
+            'lg.now': 'gerade dabei', 'lg.projects': 'projekte', 'lg.tools': 'tools', 'lg.contact': 'kontakt',
+            'role': 'generalist-entwickler <span>/</span> garry\'s mod',
+            'bio': 'Ich mache ein bisschen von allem in Garry\'s Mod: <b>GLua</b>, Maps in <b>Hammer++</b>, 3D-Modellierung und Seiten in HTML/CSS. Ich habe das <b>SCP-RP auf Project : Resonance</b> gestartet und kümmere mich täglich darum. Beim Arbeiten streame ich oft.',
+            'now.state': 'in arbeit', 'now.title': 'Innenbereich von Area 37',
+            'now.text': 'Gänge, Eindämmungszonen und Technikräume der Site-Map, gebaut in Hammer++.',
+            'now.upd': 'aktualisiert am 4. November 2026',
+            'p1.cap': 'draufsicht · hammer++',
+            'p1.text': 'Die Site-Map unseres SCP-RP. Ich baue <b>den gesamten Innenbereich</b>, den Außenbereich macht GRAVES. Die meiste Arbeit steckt darin, dass der Übergang zwischen unseren beiden Teilen sauber ist.',
+            'p1.role': 'innenbereich, level design', 'p1.state': 'in arbeit',
+            'p2.cap': 'vorstellung des modus', 'p2.kind': 'server · garry\'s mod',
+            'p2.text': 'Ich habe den SCP-RP-Modus auf Project : Resonance gestartet und leite ihn. Ich programmiere einen Teil der Systeme in GLua, arbeite an den Maps und betreue den Modus mit dem Rest des Teams.',
+            'p2.role': 'gründer, leitung', 'p2.state': 'online', 'p2.more': 'dem discord beitreten ↗',
+            'p3.cap': 'vorschau · fiktive profile', 'p3.kind': 'ui · theme',
+            'p3.text': 'Mein eigenes Theme, überall gleich: Discord, Spotify, Zen Browser und VS Code. Monospace-Schrift, Panels mit ihrem Namen auf dem Rahmen, eckige Ecken, Rot beim Hovern und eine Glas-Version.',
+            'p3.state': 'täglich im einsatz',
+            'meta.role': 'meine rolle', 'meta.tools': 'tools', 'meta.state': 'status', 'meta.base': 'basiert auf',
+            'f.daily': 'täglich', 'f.often': 'regelmäßig',
+            't1': 'systeme und skripte für den server', 't3': 'modellierung, ohne texturen', 't4': 'seiten, themes, diese website',
+            'c.links': 'links', 'copy': 'kopieren', 'copied': 'kopiert ✓', 'foot.top': 'nach oben ↑',
+            'alt1': 'Draufsicht der Map Area 37 in Hammer++',
+            'alt2': 'Vorstellung des SCP-RP-Modus auf der Website von Project : Resonance',
+            'alt3': 'Das Theme System Delta auf einem Chatfenster',
+            'desc': 'Fox Rim, Generalist-Entwickler für Garry\'s Mod: GLua, Level Design in Hammer++, 3D-Modellierung, HTML/CSS. Gründer des SCP-RP auf Project : Resonance.'
+        },
+        fr: {}
+    };
+    // le français = le texte d'origine de la page, mémorisé au chargement
+    document.querySelectorAll('[data-i18n]').forEach(function (el) { I18N.fr[el.dataset.i18n] = el.innerHTML; });
+    document.querySelectorAll('[data-i18n-alt]').forEach(function (el) { I18N.fr[el.dataset.i18nAlt] = el.alt; });
+    I18N.fr.copy = 'copier'; I18N.fr.copied = 'copié ✓';
+    var metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) I18N.fr.desc = metaDesc.content;
+
+    var LANG = 'en';
+    function setLang(l) {
+        if (!I18N[l]) l = 'en';
+        LANG = l;
+        var d = I18N[l];
+        document.documentElement.lang = l;
+        document.querySelectorAll('[data-i18n]').forEach(function (el) { var v = d[el.dataset.i18n]; if (v != null) el.innerHTML = v; });
+        document.querySelectorAll('[data-i18n-alt]').forEach(function (el) { var v = d[el.dataset.i18nAlt]; if (v != null) el.alt = v; });
+        if (metaDesc && d.desc) metaDesc.content = d.desc;
+        go.textContent = d.copy;
+        document.querySelectorAll('.lang button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.lang === l ? 'true' : 'false'); });
+        try { localStorage.setItem('foxrim-lang', l); } catch (e) {}
+    }
+    document.querySelectorAll('.lang button').forEach(function (b) { b.addEventListener('click', function () { setLang(b.dataset.lang); }); });
+    var saved = null;
+    try { saved = localStorage.getItem('foxrim-lang'); } catch (e) {}
+    setLang(saved || 'en');
+
+    /* cartes 3D : interpolation douce en requestAnimationFrame, seulement pendant le survol */
+    if (!reduce && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+        document.querySelectorAll('.card').forEach(function (card) {
+            var inner = card.querySelector('.inner');
+            var cur = { x: 0, y: 0, g: 0 }, tgt = { x: 0, y: 0, g: 0 }, gx = 50, gy = 50, raf = 0;
+            function step() {
+                cur.x += (tgt.x - cur.x) * 0.14; cur.y += (tgt.y - cur.y) * 0.14; cur.g += (tgt.g - cur.g) * 0.14;
+                inner.style.setProperty('--rx', cur.x.toFixed(2) + 'deg');
+                inner.style.setProperty('--ry', cur.y.toFixed(2) + 'deg');
+                inner.style.setProperty('--go', cur.g.toFixed(3));
+                inner.style.setProperty('--gx', gx + '%'); inner.style.setProperty('--gy', gy + '%');
+                if (Math.abs(tgt.x - cur.x) + Math.abs(tgt.y - cur.y) + Math.abs(tgt.g - cur.g) > 0.01) raf = requestAnimationFrame(step);
+                else raf = 0;
+            }
+            function kick() { if (!raf) raf = requestAnimationFrame(step); }
+            card.addEventListener('pointermove', function (e) {
+                var r = card.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+                tgt.y = (x - 0.5) * 9; tgt.x = (0.5 - y) * 7; tgt.g = 1; gx = x * 100; gy = y * 100;
+                card.classList.add('on'); kick();
+            });
+            card.addEventListener('pointerleave', function () { tgt.x = 0; tgt.y = 0; tgt.g = 0; card.classList.remove('on'); kick(); });
+        });
+    }
+
+    /* fond (même ambiance que desc.gg/foxrim) : demi-résolution, 30 i/s, en pause quand l'onglet est caché */
+    var c = document.getElementById('bg'), ctx = c.getContext('2d');
+    var W, H, S = 0.5, parts = [], last = 0, running = true;
+    function size() {
+        W = c.clientWidth; H = c.clientHeight;
+        c.width = Math.round(W * S); c.height = Math.round(H * S);
+        ctx.setTransform(S, 0, 0, S, 0, 0);
+        parts = [];
+        var n = Math.round(Math.min(34, W * H / 45000));
+        for (var i = 0; i < n; i++) parts.push({ x: Math.random() * W, y: Math.random() * H, s: 5 + Math.random() * 9,
+            r: Math.random() * 6.28, vr: (Math.random() - .5) * .006, vy: .12 + Math.random() * .3,
+            sw: 6 + Math.random() * 14, ph: Math.random() * 6.28, red: Math.random() < .55, a: .07 + Math.random() * .16 });
+    }
+    function glow(x, y, rad, col) {
+        var g = ctx.createRadialGradient(x, y, 0, x, y, rad);
+        g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
+    function draw(t) {
+        var k = t / 1000;
+        ctx.clearRect(0, 0, W, H);
+        glow(W * (.5 + .1 * Math.cos(k * .05)), H * (.4 + .08 * Math.sin(k * .05)), Math.max(W, H) * .5, 'rgba(242,85,90,0.08)');
+        glow(W * (.5 - .22 * Math.cos(k * .05 + 1.3)), H * (.75 - .12 * Math.sin(k * .05 + 1.3)), Math.max(W, H) * .45, 'rgba(120,30,34,0.15)');
+        for (var i = 0; i < parts.length; i++) {
+            var p = parts[i];
+            var x = p.x + Math.sin(k * .4 + p.ph) * p.sw, y = p.y;
+            var e = Math.min(1, (y + 30) / (H * .18), (H + 30 - y) / (H * .18));
+            ctx.globalAlpha = Math.max(0, p.a * e);
+            ctx.fillStyle = p.red ? '#f2555a' : '#f4f2f2';
+            ctx.beginPath();
+            for (var j = 0; j < 3; j++) { var an = p.r + j * 2.094; ctx[j ? 'lineTo' : 'moveTo'](x + p.s * Math.cos(an), y + p.s * Math.sin(an)); }
+            ctx.closePath(); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+    }
+    function loop(t) {
+        if (!running) return;
+        if (t - last >= 33) {
+            var dt = Math.min(3, (t - last) / 16.7); last = t;
+            for (var i = 0; i < parts.length; i++) { var p = parts[i]; p.y -= p.vy * dt; p.r += p.vr * dt; if (p.y < -30) { p.y = H + 30; p.x = Math.random() * W; } }
+            draw(t);
+        }
+        requestAnimationFrame(loop);
+    }
+    size(); draw(0);
+    window.addEventListener('resize', function () { size(); draw(performance.now()); });
+    if (!reduce) {
+        document.addEventListener('visibilitychange', function () { running = !document.hidden; if (running) requestAnimationFrame(loop); });
+        requestAnimationFrame(loop);
+    }
+})();
+</script>
+
+</body>
+</html>
